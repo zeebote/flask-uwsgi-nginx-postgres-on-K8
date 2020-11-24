@@ -1,0 +1,82 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-flaskr
+  labels:
+    k8s-app: nginx-flaskr
+  namespace: flaskr
+spec:
+  selector:
+    k8s-app: nginx-flaskr
+  ports:
+    - port: 80
+      targetPort: 8080
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-flaskr-exporter
+  labels:
+    k8s-app: nginx-flaskr-exporter
+  namespace: flaskr
+spec:
+  selector:
+    k8s-app: nginx-flaskr
+  ports:
+    - name: nginx-exporter
+      port: 9113 
+      targetPort: 9113
+
+---
+# HAproxy ingress, remove or change it to your env.
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: nginx-flaskr
+  namespace: flaskr
+spec:
+  rules:
+  # This is your serving URL, it shout match with Django allow host in poll-configmap
+  - host: your.app.serving.com
+    http:
+      paths:
+      - backend:
+          serviceName: nginx-flaskr
+          servicePort: 80
+        path: /
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-flaskr
+  labels:
+    k8s-app: nginx-flaskr
+  namespace: flaskr
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: nginx-flaskr
+  template:
+    metadata:
+      labels:
+        k8s-app: nginx-flaskr
+    spec:
+      containers:
+        - image: trucv/nginxflaskr
+          imagePullPolicy: "Always"
+          name: nginxflaskr
+          ports:
+            - containerPort: 8080
+              name: nginxflaskr
+        - name: nginx-flaskr-exporter
+          image: nginx/nginx-prometheus-exporter:0.8.0
+          args:
+            - -nginx.scrape-uri=http://localhost:8080/nginx/status
+          ports:
+            - containerPort: 9113
+              name: nginx-exporter

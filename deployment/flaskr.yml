@@ -1,0 +1,102 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flaskr-config
+  labels:
+    k8s-app: flaskr
+  namespace: flaskr
+data:
+  FLASK_APP: flaskr
+---
+
+kind: Secret
+apiVersion: v1
+metadata:
+  name: flaskr-secret
+  namespace: flaskr
+  labels:
+    k8s-app: flaskr
+type: Opaque
+data:
+  #String output from cli: echo -n "Django secret key" | base64
+  SECRET_KEY: ZHM5ZjdzZGYwczgwOWRmODBzOThkMDlmOHMw
+  DATABASE_URL: cG9zdGdyZXM6Ly9wb3N0Z3Jlczpwb3N0Z3Jlc0Bwb3N0Z3Jlczo1NDMyL3Bvc3RncmVz
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: flaskr
+  labels:
+    k8s-app: flaskr
+  namespace: flaskr
+spec:
+  selector:
+    k8s-app: flaskr
+  ports:
+    - name: flaskr-svc
+      protocol: TCP
+      port: 5000
+      targetPort: 5000
+
+---
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: uwsgi-exporter
+  labels:
+    k8s-app: uwsgi-exporter
+  namespace: flaskr
+spec:
+  selector:
+    k8s-app: flaskr
+  ports:
+    - name: uwsgi-exporter
+      protocol: TCP
+      port: 9117
+      targetPort: 9117
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flaskr
+  labels:
+    k8s-app: flaskr
+  namespace: flaskr
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      k8s-app: flaskr
+  template:
+    metadata:
+      labels:
+        k8s-app: flaskr
+    spec:
+      containers:
+        - image: trucv/flaskr
+          imagePullPolicy: "Always"
+          name: flaskr
+          envFrom:
+          - secretRef:
+              name: flaskr-secret
+          - configMapRef:
+              name: flaskr-config
+          ports:
+            - containerPort: 5000
+              name: uwsg
+        - image: timonwong/uwsgi-exporter
+          imagePullPolicy: "IfNotPresent"
+          name: uwsgi-exporter
+          args:
+            - --stats.uri=http://localhost:1717
+          ports:
+            - containerPort: 9117
+              name: uwsgi-exporter
+
